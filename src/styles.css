@@ -1,0 +1,533 @@
+/* ============================================
+   RecordIt — Dark Theme Styles
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-panel: #1e2a47;
+  --bg-card: #253255;
+  --bg-hover: #2d3d66;
+  --text-primary: #e8eaf6;
+  --text-secondary: #9fa8c7;
+  --text-muted: #6b7294;
+  --accent: #e94560;
+  --accent-glow: rgba(233, 69, 96, 0.3);
+  --accent-green: #4ecca3;
+  --accent-green-glow: rgba(78, 204, 163, 0.3);
+  --accent-blue: #3a86ff;
+  --accent-orange: #ff8c42;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-light: rgba(255, 255, 255, 0.1);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --transition: 0.2s ease;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ---- Header ---- */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.app-header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  display: inline-block;
+}
+
+.indicator.recording {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+/* ---- Main Layout ---- */
+.app-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.controls-panel {
+  width: 340px;
+  min-width: 300px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.recordings-panel {
+  flex: 1;
+  background: var(--bg-primary);
+}
+
+/* ---- Sections ---- */
+.section {
+  margin-bottom: 20px;
+}
+
+.section h2 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* ---- Mode Toggle ---- */
+.mode-toggle {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-panel);
+  padding: 4px;
+  border-radius: var(--radius);
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+}
+
+.mode-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.mode-btn.active {
+  background: var(--accent-blue);
+  color: white;
+  box-shadow: 0 2px 8px rgba(58, 134, 255, 0.3);
+}
+
+/* ---- Selects ---- */
+select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239fa8c7' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  outline: none;
+  transition: var(--transition);
+}
+
+select:hover, select:focus {
+  border-color: var(--accent-blue);
+}
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-small {
+  padding: 5px 10px;
+  font-size: 12px;
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+
+.btn-small:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ---- Record Controls ---- */
+.record-controls {
+  display: flex;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.btn-record {
+  flex: 1;
+  background: var(--accent);
+  color: white;
+  justify-content: center;
+  font-size: 15px;
+  padding: 14px;
+  border-radius: var(--radius);
+}
+
+.btn-record:hover:not(:disabled) {
+  background: #d63851;
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.btn-record .btn-icon {
+  font-size: 18px;
+}
+
+.btn-stop {
+  flex: 1;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  justify-content: center;
+  font-size: 15px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+}
+
+.btn-stop:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+/* ---- Effects ---- */
+.effects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.effect-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.effect-item:hover {
+  background: var(--bg-hover);
+}
+
+.effect-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.effect-item.unsupported {
+  opacity: 0.4;
+}
+
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-card);
+  border-radius: 22px;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid var(--border-light);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition: var(--transition);
+}
+
+.toggle input:checked + .toggle-slider {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+  background: white;
+}
+
+.toggle input:disabled + .toggle-slider {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- Mic Mode ---- */
+.mic-mode-group {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.mic-mode-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+}
+
+.mic-mode-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.mic-mode-btn.active {
+  background: var(--accent-blue);
+  color: white;
+  border-color: var(--accent-blue);
+}
+
+/* ---- Recordings List ---- */
+.recordings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.recordings-header h2 {
+  margin-bottom: 0;
+}
+
+.folder-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.folder-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recordings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recording-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.recording-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+}
+
+.recording-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.recording-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.recording-name:hover {
+  color: var(--accent-blue);
+}
+
+.recording-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.recording-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.recording-item:hover .recording-actions {
+  opacity: 1;
+}
+
+.recording-actions button {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.recording-actions button:hover {
+  background: var(--accent-blue);
+  color: white;
+}
+
+.recording-actions button.delete-btn:hover {
+  background: var(--accent);
+}
+
+/* ---- Rename Input ---- */
+.rename-input {
+  background: var(--bg-card);
+  border: 1px solid var(--accent-blue);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+}
+
+/* ---- Muted text ---- */
+.muted {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+/* ---- Status Bar ---- */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 24px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

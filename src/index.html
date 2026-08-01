@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RecordIt</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="app-header">
+      <h1>🎬 RecordIt</h1>
+      <div class="header-status">
+        <span id="recording-indicator" class="indicator"></span>
+        <span id="recording-timer">00:00:00</span>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <!-- Left Panel: Controls -->
+      <section class="panel controls-panel">
+        <!-- Mode Toggle -->
+        <div class="section">
+          <h2>Recording Mode</h2>
+          <div class="mode-toggle">
+            <button id="mode-video" class="mode-btn active" data-mode="video">
+              📹 Video + Audio
+            </button>
+            <button id="mode-audio" class="mode-btn" data-mode="audio">
+              🎙️ Audio Only
+            </button>
+          </div>
+        </div>
+
+        <!-- Device Selectors -->
+        <div class="section" id="camera-section">
+          <h2>Camera</h2>
+          <select id="camera-select">
+            <option value="">Loading cameras...</option>
+          </select>
+        </div>
+
+        <div class="section">
+          <h2>Microphone</h2>
+          <select id="mic-select">
+            <option value="">Loading microphones...</option>
+          </select>
+        </div>
+
+        <!-- Record Controls -->
+        <div class="section record-controls">
+          <button id="btn-record" class="btn btn-record">
+            <span class="btn-icon">⏺</span>
+            <span>Record</span>
+          </button>
+          <button id="btn-stop" class="btn btn-stop" disabled>
+            <span class="btn-icon">⏹</span>
+            <span>Stop</span>
+          </button>
+        </div>
+
+        <!-- Effects Panel -->
+        <div class="section" id="effects-section">
+          <h2>Camera Effects</h2>
+          <div id="effects-list" class="effects-list">
+            <p class="muted">Loading effects...</p>
+          </div>
+        </div>
+
+        <!-- Mic Mode -->
+        <div class="section">
+          <h2>Mic Mode</h2>
+          <div class="mic-mode-group">
+            <button class="mic-mode-btn active" data-mode="standard">Standard</button>
+            <button class="mic-mode-btn" data-mode="voiceIsolation">Voice Isolation</button>
+            <button class="mic-mode-btn" data-mode="wideSpectrum">Wide Spectrum</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Recordings -->
+      <section class="panel recordings-panel">
+        <div class="section">
+          <div class="recordings-header">
+            <h2>Recordings</h2>
+            <div class="folder-controls">
+              <span id="folder-path" class="folder-path" title="">~/Movies/RecordIt</span>
+              <button id="btn-change-folder" class="btn btn-small">📂 Change</button>
+              <button id="btn-open-folder" class="btn btn-small">↗ Open</button>
+            </div>
+          </div>
+          <div id="recordings-list" class="recordings-list">
+            <p class="muted">No recordings yet</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <span id="status-message">Ready</span>
+      <span id="permissions-status"></span>
+    </footer>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

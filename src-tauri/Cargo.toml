@@ -1,0 +1,24 @@
+[package]
+name = "recordit"
+version = "0.1.0"
+description = "A macOS recording app with camera effects support"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "recordit_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+swift-rs = { version = "1.0" }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+swift-rs = { version = "1.0" }
+chrono = "0.4"
+dirs = "6"
+open = "5"

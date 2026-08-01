@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Rust build output
+src-tauri/target/
+
+# Swift build output
+src-tauri/swift-lib/.build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+*.dmg
