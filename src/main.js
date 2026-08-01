@@ -1,5 +1,5 @@
 // ============================================
-// RecordIt — Main Application Script
+// RecordIt Studio — Main Application Script
 // Uses window.__TAURI__ global (injected by withGlobalTauri)
 // ============================================
 
@@ -10,6 +10,8 @@ let currentMode = 'video'; // 'video' or 'audio'
 let isRecording = false;
 let timerInterval = null;
 let recordingStartTime = null;
+let recordingsCache = [];
+let animFrameId = null;
 
 // ============================================
 // DOM Elements
@@ -24,14 +26,22 @@ const elements = {
   btnRecord: $('#btn-record'),
   btnStop: $('#btn-stop'),
   recordingIndicator: $('#recording-indicator'),
+  recordingModeBadge: $('#recording-mode-badge'),
   recordingTimer: $('#recording-timer'),
   effectsList: $('#effects-list'),
   recordingsList: $('#recordings-list'),
+  recordingsCount: $('#recordings-count'),
   folderPath: $('#folder-path'),
   btnChangeFolder: $('#btn-change-folder'),
   btnOpenFolder: $('#btn-open-folder'),
+  searchInput: $('#search-input'),
+  searchClear: $('#search-clear'),
   statusMessage: $('#status-message'),
   permissionsStatus: $('#permissions-status'),
+  audioCanvas: $('#audio-canvas'),
+  audioSignalState: $('#audio-signal-state'),
+  chipCam: $('#chip-cam'),
+  chipMic: $('#chip-mic'),
 };
 
 // ============================================
@@ -50,39 +60,21 @@ function getTauriInvoke() {
   return null;
 }
 
-function debugTauri() {
-  const info = [];
-  info.push('__TAURI__: ' + (typeof window.__TAURI__));
-  if (window.__TAURI__) {
-    info.push('keys: ' + Object.keys(window.__TAURI__).join(', '));
-    info.push('core: ' + (typeof window.__TAURI__.core));
-    if (window.__TAURI__.core) {
-      info.push('core.invoke: ' + (typeof window.__TAURI__.core.invoke));
-    }
-    info.push('invoke: ' + (typeof window.__TAURI__.invoke));
-  }
-  info.push('__TAURI_INTERNALS__: ' + (typeof window.__TAURI_INTERNALS__));
-  return info.join('\n');
-}
-
 // ============================================
 // Initialization
 // ============================================
 document.addEventListener('DOMContentLoaded', async () => {
-  // Show debug info
-  console.log(debugTauri());
-
   const invoke = getTauriInvoke();
   if (!invoke) {
     setStatus('ERROR: Tauri API not found. withGlobalTauri must be enabled.', true);
-    document.body.innerHTML = '<div style="padding:40px;color:red;font-family:monospace;"><h2>Tauri API Not Found</h2><pre>' + debugTauri() + '</pre></div>';
+    document.body.innerHTML = '<div style="padding:40px;color:#ff3b5c;font-family:sans-serif;"><h2>Tauri API Not Found</h2><p>Please launch via Tauri app wrapper.</p></div>';
     return;
   }
 
-  // Store invoke globally for all functions to use
   window.__recordit_invoke = invoke;
 
   setupEventListeners();
+  initAudioVisualizer();
 
   try {
     await requestPermissions();
@@ -115,24 +107,43 @@ function setupEventListeners() {
       $$('.mode-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentMode = btn.dataset.mode;
-      elements.cameraSection.style.display = currentMode === 'audio' ? 'none' : 'block';
-      if (elements.effectsList.parentElement) {
-        elements.effectsList.parentElement.style.display = currentMode === 'audio' ? 'none' : 'block';
+      
+      elements.cameraSection.style.display = currentMode === 'audio' ? 'none' : 'flex';
+      const effectsSec = $('#effects-section');
+      if (effectsSec) {
+        effectsSec.style.display = currentMode === 'audio' ? 'none' : 'flex';
       }
-      setStatus(currentMode === 'video' ? 'Video + Audio mode' : 'Audio only mode');
+      
+      elements.recordingModeBadge.textContent = currentMode === 'video' ? 'REC VIDEO' : 'REC AUDIO';
+      setStatus(currentMode === 'video' ? 'Video + Audio mode selected' : 'Audio only mode selected');
     });
   });
 
-  // Record / Stop
+  // Record / Stop buttons
   elements.btnRecord.addEventListener('click', startRecording);
   elements.btnStop.addEventListener('click', stopRecording);
 
-  // Camera / Mic selection
+  // Search input filter
+  if (elements.searchInput) {
+    elements.searchInput.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      elements.searchClear.style.display = q ? 'block' : 'none';
+      renderRecordingsList(recordingsCache.filter(r => r.name.toLowerCase().includes(q)));
+    });
+
+    elements.searchClear.addEventListener('click', () => {
+      elements.searchInput.value = '';
+      elements.searchClear.style.display = 'none';
+      renderRecordingsList(recordingsCache);
+    });
+  }
+
+  // Camera / Mic dropdowns
   elements.cameraSelect.addEventListener('change', async (e) => {
     if (e.target.value) {
       try {
         await invoke('select_camera', { deviceId: e.target.value });
-        setStatus(`Camera: ${e.target.options[e.target.selectedIndex].text}`);
+        setStatus(`Camera switched to: ${e.target.options[e.target.selectedIndex].text}`);
       } catch (err) {
         setStatus(`Error selecting camera: ${err}`, true);
       }
@@ -143,46 +154,48 @@ function setupEventListeners() {
     if (e.target.value) {
       try {
         await invoke('select_microphone', { deviceId: e.target.value });
-        setStatus(`Mic: ${e.target.options[e.target.selectedIndex].text}`);
+        setStatus(`Microphone switched to: ${e.target.options[e.target.selectedIndex].text}`);
       } catch (err) {
         setStatus(`Error selecting mic: ${err}`, true);
       }
     }
   });
 
-  // Mic mode
+  // Mic mode buttons
   $$('.mic-mode-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       $$('.mic-mode-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       try {
         await invoke('toggle_effect', { name: `micMode_${btn.dataset.mode}`, enabled: true });
-        setStatus(`Mic mode: ${btn.textContent}`);
+        setStatus(`Mic mode set to: ${btn.textContent}`);
       } catch (err) {
         setStatus(`Error setting mic mode: ${err}`, true);
       }
     });
   });
 
-  // Folder controls
+  // Folder management
   elements.btnChangeFolder.addEventListener('click', changeFolder);
   elements.btnOpenFolder.addEventListener('click', openFolder);
 }
 
 // ============================================
-// Permissions
+// Permissions Check
 // ============================================
 async function requestPermissions() {
   try {
     const resultStr = await invoke('request_permissions');
     const data = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
     if (data && data.success) {
-      elements.permissionsStatus.textContent = '✅ Permissions: ' + (data.data || 'granted');
+      elements.permissionsStatus.textContent = 'Permissions: Granted';
+      if (elements.chipCam) elements.chipCam.classList.remove('off');
+      if (elements.chipMic) elements.chipMic.classList.remove('off');
     } else {
-      elements.permissionsStatus.textContent = '⚠️ Permissions needed: ' + ((data && data.error) || '');
+      elements.permissionsStatus.textContent = 'Permissions needed';
     }
   } catch (err) {
-    elements.permissionsStatus.textContent = '⚠️ Permission check failed: ' + err;
+    elements.permissionsStatus.textContent = 'Permissions error';
     console.error('Permission error:', err);
   }
 }
@@ -193,27 +206,24 @@ async function requestPermissions() {
 async function loadDevices() {
   try {
     const resultStr = await invoke('list_devices');
-    console.log('list_devices raw result:', resultStr);
     const data = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
-    console.log('list_devices parsed:', data);
 
     if (!data || !data.success) {
       setStatus('Failed to load devices: ' + ((data && data.error) || 'Unknown'), true);
-      elements.cameraSelect.innerHTML = '<option value="">Error loading</option>';
-      elements.micSelect.innerHTML = '<option value="">Error loading</option>';
+      elements.cameraSelect.innerHTML = '<option value="">Error loading cameras</option>';
+      elements.micSelect.innerHTML = '<option value="">Error loading microphones</option>';
       return;
     }
 
     const devices = data.data || [];
-    console.log('Devices found:', devices.length, devices);
-
     const cameras = devices.filter(d => d.type === 'video');
     const mics = devices.filter(d => d.type === 'audio');
 
-    // Populate camera select
+    // Cameras
     elements.cameraSelect.innerHTML = '';
     if (cameras.length === 0) {
-      elements.cameraSelect.innerHTML = '<option value="">No cameras found</option>';
+      elements.cameraSelect.innerHTML = '<option value="">No camera available</option>';
+      if (elements.chipCam) elements.chipCam.classList.add('off');
     } else {
       cameras.forEach(cam => {
         const opt = document.createElement('option');
@@ -221,12 +231,14 @@ async function loadDevices() {
         opt.textContent = cam.name + (cam.deviceType === 'continuity' ? ' (iPhone)' : '');
         elements.cameraSelect.appendChild(opt);
       });
+      if (elements.chipCam) elements.chipCam.classList.remove('off');
     }
 
-    // Populate mic select
+    // Mics
     elements.micSelect.innerHTML = '';
     if (mics.length === 0) {
-      elements.micSelect.innerHTML = '<option value="">No microphones found</option>';
+      elements.micSelect.innerHTML = '<option value="">No microphone available</option>';
+      if (elements.chipMic) elements.chipMic.classList.add('off');
     } else {
       mics.forEach(mic => {
         const opt = document.createElement('option');
@@ -234,25 +246,23 @@ async function loadDevices() {
         opt.textContent = mic.name;
         elements.micSelect.appendChild(opt);
       });
+      if (elements.chipMic) elements.chipMic.classList.remove('off');
     }
 
-    setStatus(`Found ${cameras.length} camera(s), ${mics.length} mic(s)`);
+    setStatus(`Devices loaded: ${cameras.length} camera(s), ${mics.length} mic(s)`);
   } catch (err) {
     setStatus('Error loading devices: ' + err, true);
-    console.error('Device error:', err);
-    elements.cameraSelect.innerHTML = '<option value="">Error: ' + err + '</option>';
-    elements.micSelect.innerHTML = '<option value="">Error: ' + err + '</option>';
   }
 }
 
 // ============================================
-// Recording
+// Recording Controls
 // ============================================
 async function startRecording() {
   try {
     elements.btnRecord.disabled = true;
     elements.btnStop.disabled = false;
-    setStatus('Starting recording...');
+    setStatus('Initializing recording stream...');
 
     const resultStr = await invoke('start_recording', { mode: currentMode });
     const data = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
@@ -260,9 +270,15 @@ async function startRecording() {
     if (data && data.success) {
       isRecording = true;
       elements.recordingIndicator.classList.add('recording');
+      elements.recordingIndicator.parentElement.classList.add('is-recording');
+      if (elements.audioSignalState) {
+        elements.audioSignalState.textContent = 'LIVE';
+        elements.audioSignalState.classList.add('active');
+      }
+
       recordingStartTime = Date.now();
       timerInterval = setInterval(updateTimer, 1000);
-      setStatus('Recording...');
+      setStatus(`Recording started (${currentMode.toUpperCase()})`);
     } else {
       elements.btnRecord.disabled = false;
       elements.btnStop.disabled = true;
@@ -279,19 +295,25 @@ async function startRecording() {
 async function stopRecording() {
   try {
     elements.btnStop.disabled = true;
-    setStatus('Stopping recording...');
+    setStatus('Finalizing recording file...');
 
     const resultStr = await invoke('stop_recording');
     const data = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
 
     isRecording = false;
     elements.recordingIndicator.classList.remove('recording');
+    elements.recordingIndicator.parentElement.classList.remove('is-recording');
+    if (elements.audioSignalState) {
+      elements.audioSignalState.textContent = 'IDLE';
+      elements.audioSignalState.classList.remove('active');
+    }
+
     elements.btnRecord.disabled = false;
     clearInterval(timerInterval);
     elements.recordingTimer.textContent = '00:00:00';
 
     if (data && data.success) {
-      setStatus('Recording saved!');
+      setStatus('Recording saved successfully!');
       await loadRecordings();
     } else {
       setStatus('Stop error: ' + ((data && data.error) || 'Unknown'), true);
@@ -301,7 +323,6 @@ async function stopRecording() {
     elements.recordingIndicator.classList.remove('recording');
     clearInterval(timerInterval);
     setStatus('Stop error: ' + err, true);
-    console.error('Stop error:', err);
   }
 }
 
@@ -315,7 +336,7 @@ function updateTimer() {
 }
 
 // ============================================
-// Effects
+// Camera Effects
 // ============================================
 async function loadEffects() {
   try {
@@ -323,13 +344,13 @@ async function loadEffects() {
     const data = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
 
     if (!data || !data.success) {
-      elements.effectsList.innerHTML = '<p class="muted">Could not load effects</p>';
+      elements.effectsList.innerHTML = '<p class="empty-desc" style="padding:10px;text-align:center;">Effects unavailable</p>';
       return;
     }
 
     const effects = data.data || [];
     if (effects.length === 0) {
-      elements.effectsList.innerHTML = '<p class="muted">No effects available</p>';
+      elements.effectsList.innerHTML = '<p class="empty-desc" style="padding:10px;text-align:center;">No hardware effects found</p>';
       return;
     }
 
@@ -354,7 +375,7 @@ async function loadEffects() {
         checkbox.addEventListener('change', async (e) => {
           try {
             await invoke('toggle_effect', { name: effect.id, enabled: e.target.checked });
-            setStatus(`${effect.name}: ${e.target.checked ? 'On' : 'Off'}`);
+            setStatus(`${effect.name}: ${e.target.checked ? 'Enabled' : 'Disabled'}`);
           } catch (err) {
             e.target.checked = !e.target.checked;
             setStatus(`Error toggling ${effect.name}: ${err}`, true);
@@ -363,8 +384,7 @@ async function loadEffects() {
       }
     });
   } catch (err) {
-    elements.effectsList.innerHTML = '<p class="muted">Effects unavailable</p>';
-    console.error('Effects error:', err);
+    elements.effectsList.innerHTML = '<p class="empty-desc" style="padding:10px;text-align:center;">Effects unavailable</p>';
   }
 }
 
@@ -376,74 +396,119 @@ async function loadRecordings() {
     const resultStr = await invoke('list_recordings');
     const data = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
 
-    if (!data || !data.success || !data.data || data.data.length === 0) {
-      elements.recordingsList.innerHTML = '<p class="muted">No recordings yet</p>';
+    if (!data || !data.success || !data.data) {
+      recordingsCache = [];
+      renderRecordingsList([]);
       return;
     }
 
-    elements.recordingsList.innerHTML = '';
-    data.data.forEach(rec => {
-      const item = document.createElement('div');
-      item.className = 'recording-item';
-      const size = formatFileSize(rec.size || 0);
-      const date = rec.modified ? new Date(rec.modified).toLocaleString() : '';
-      const ext = (rec.name || '').split('.').pop().toUpperCase();
+    recordingsCache = data.data;
+    const filterQuery = elements.searchInput ? elements.searchInput.value.toLowerCase() : '';
+    const filtered = filterQuery ? recordingsCache.filter(r => r.name.toLowerCase().includes(filterQuery)) : recordingsCache;
+    renderRecordingsList(filtered);
+  } catch (err) {
+    elements.recordingsList.innerHTML = '<p class="empty-desc" style="padding:20px;text-align:center;">Error loading recordings</p>';
+  }
+}
 
-      item.innerHTML = `
+function renderRecordingsList(list) {
+  elements.recordingsCount.textContent = `${list.length} item${list.length === 1 ? '' : 's'}`;
+
+  if (!list || list.length === 0) {
+    elements.recordingsList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="2" width="20" height="20" rx="5"/>
+            <path d="M10 9l5 3-5 3V9z"/>
+          </svg>
+        </div>
+        <p class="empty-title">${elements.searchInput && elements.searchInput.value ? 'No matching recordings' : 'No recordings yet'}</p>
+        <p class="empty-desc">${elements.searchInput && elements.searchInput.value ? 'Try clearing your search query' : 'Hit "Start Recording" to create your first video or audio clip.'}</p>
+      </div>
+    `;
+    return;
+  }
+
+  elements.recordingsList.innerHTML = '';
+  list.forEach(rec => {
+    const item = document.createElement('div');
+    item.className = 'recording-card';
+    const size = formatFileSize(rec.size || 0);
+    const date = rec.modified ? new Date(rec.modified).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    const ext = (rec.name || '').split('.').pop().toLowerCase();
+    const isVideoFormat = ['mp4', 'mov', 'mkv', 'webm'].includes(ext);
+
+    item.innerHTML = `
+      <div class="recording-left">
+        <div class="file-icon-badge ${isVideoFormat ? 'video' : 'audio'}">
+          ${isVideoFormat ? 
+            `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>` : 
+            `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>`
+          }
+        </div>
         <div class="recording-info">
           <div class="recording-name" title="${rec.name}">${rec.name}</div>
-          <div class="recording-meta">${ext} · ${size} · ${date}</div>
+          <div class="recording-meta">
+            <span class="format-tag">${ext.toUpperCase()}</span>
+            <span>·</span>
+            <span>${size}</span>
+            <span>·</span>
+            <span>${date}</span>
+          </div>
         </div>
-        <div class="recording-actions">
-          <button class="play-btn" title="Open">▶</button>
-          <button class="rename-btn" title="Rename">✏️</button>
-          <button class="reveal-btn" title="Reveal in Finder">📂</button>
-          <button class="delete-btn" title="Delete">🗑</button>
-        </div>
-      `;
+      </div>
+      <div class="recording-actions">
+        <button class="action-btn play-btn" title="Open / Play">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="action-btn rename-btn" title="Rename File">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        </button>
+        <button class="action-btn reveal-btn" title="Reveal in Finder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="action-btn delete-btn" title="Delete Clip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>
+    `;
 
-      // Play
-      item.querySelector('.play-btn').addEventListener('click', async () => {
-        try {
-          await invoke('open_recording', { path: rec.path });
-        } catch (err) {
-          setStatus('Open error: ' + err, true);
-        }
-      });
-
-      // Rename
-      item.querySelector('.rename-btn').addEventListener('click', () => {
-        startRename(item, rec);
-      });
-
-      // Reveal
-      item.querySelector('.reveal-btn').addEventListener('click', async () => {
-        try {
-          await invoke('reveal_in_finder', { path: rec.path });
-        } catch (err) {
-          setStatus('Reveal error: ' + err, true);
-        }
-      });
-
-      // Delete
-      item.querySelector('.delete-btn').addEventListener('click', async () => {
-        if (confirm(`Delete "${rec.name}"?`)) {
-          try {
-            await invoke('delete_recording', { path: rec.path });
-            setStatus(`Deleted ${rec.name}`);
-            await loadRecordings();
-          } catch (err) {
-            setStatus('Delete error: ' + err, true);
-          }
-        }
-      });
-
-      elements.recordingsList.appendChild(item);
+    // Action handlers
+    item.querySelector('.play-btn').addEventListener('click', async () => {
+      try {
+        await invoke('open_recording', { path: rec.path });
+      } catch (err) {
+        setStatus('Open error: ' + err, true);
+      }
     });
-  } catch (err) {
-    elements.recordingsList.innerHTML = '<p class="muted">Error loading recordings</p>';
-    console.error('Recordings error:', err);
-  }
+
+    item.querySelector('.rename-btn').addEventListener('click', () => {
+      startRename(item, rec);
+    });
+
+    item.querySelector('.reveal-btn').addEventListener('click', async () => {
+      try {
+        await invoke('reveal_in_finder', { path: rec.path });
+      } catch (err) {
+        setStatus('Reveal error: ' + err, true);
+      }
+    });
+
+    item.querySelector('.delete-btn').addEventListener('click', async () => {
+      if (confirm(`Delete "${rec.name}"?`)) {
+        try {
+          await invoke('delete_recording', { path: rec.path });
+          setStatus(`Deleted ${rec.name}`);
+          await loadRecordings();
+        } catch (err) {
+          setStatus('Delete error: ' + err, true);
+        }
+      }
+    });
+
+    elements.recordingsList.appendChild(item);
+  });
 }
 
 function startRename(item, rec) {
@@ -464,7 +529,7 @@ function startRename(item, rec) {
     if (newName && newName !== nameWithoutExt) {
       try {
         await invoke('rename_recording', { oldPath: rec.path, newName: newName });
-        setStatus(`Renamed to ${newName}`);
+        setStatus(`Renamed clip to ${newName}`);
         await loadRecordings();
       } catch (err) {
         setStatus('Rename error: ' + err, true);
@@ -509,11 +574,10 @@ async function loadFolder() {
 
 async function changeFolder() {
   try {
-    // Use prompt dialog since we don't have the dialog plugin JS API without bundler
-    const path = prompt('Enter new recordings folder path:');
+    const path = prompt('Enter new recordings directory path:');
     if (path) {
       await invoke('set_recordings_folder', { path: path });
-      setStatus('Folder changed');
+      setStatus('Recordings directory updated');
       await loadFolder();
       await loadRecordings();
     }
@@ -535,11 +599,65 @@ async function openFolder() {
 }
 
 // ============================================
-// Utilities
+// Audio Spectrum Visualizer Canvas
+// ============================================
+function initAudioVisualizer() {
+  const canvas = elements.audioCanvas;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const barCount = 32;
+  const bars = new Array(barCount).fill(4);
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const width = canvas.width;
+    const height = canvas.height;
+    const barWidth = (width / barCount) - 3;
+
+    for (let i = 0; i < barCount; i++) {
+      if (isRecording) {
+        // Active recording waveform signal
+        const target = Math.random() * (height - 8) + 6;
+        bars[i] += (target - bars[i]) * 0.25;
+      } else {
+        // Ambient low amplitude signal
+        const target = Math.sin(Date.now() * 0.003 + i * 0.2) * 4 + 6;
+        bars[i] += (target - bars[i]) * 0.1;
+      }
+
+      const barHeight = Math.max(3, bars[i]);
+      const x = i * (barWidth + 3);
+      const y = (height - barHeight) / 2;
+
+      // Gradient color based on recording status
+      const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
+      if (isRecording) {
+        gradient.addColorStop(0, '#ff3b5c');
+        gradient.addColorStop(1, '#8b5cf6');
+      } else {
+        gradient.addColorStop(0, '#3b82f6');
+        gradient.addColorStop(1, '#10b981');
+      }
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.roundRect(x, y, barWidth, barHeight, 2);
+      ctx.fill();
+    }
+
+    animFrameId = requestAnimationFrame(draw);
+  }
+
+  draw();
+}
+
+// ============================================
+// Helper Utilities
 // ============================================
 function setStatus(message, isError = false) {
   elements.statusMessage.textContent = message;
-  elements.statusMessage.style.color = isError ? 'var(--accent)' : 'var(--text-muted)';
+  elements.statusMessage.style.color = isError ? 'var(--accent-red)' : 'var(--text-muted)';
 }
 
 function formatFileSize(bytes) {
